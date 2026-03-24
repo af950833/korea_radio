@@ -1,2 +1,149 @@
-# korea_radio
-Home Assistant Korea Radio custom component
+# Korea Radio for Home Assistant
+
+![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg)
+![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.6+-blue.svg)
+![Version](https://img.shields.io/github/v/release/<your_repo>/korea_radio)
+![License](https://img.shields.io/badge/license-MIT-green)
+
+한국 주요 라디오 채널을 Home Assistant에서 재생할 수 있는 커스텀 통합입니다.
+Google Home(Chromecast) 등 `media_player` 엔티티로 바로 캐스트하여 사용할 수 있습니다.
+
+---
+
+## 🎬 미리보기
+
+### 📻 재생 화면
+
+![preview](https://raw.githubusercontent.com/<your_repo>/korea_radio/main/images/preview.png)
+
+### 🎚 볼륨 조절 + 채널 선택
+
+![preview2](https://raw.githubusercontent.com/<your_repo>/korea_radio/main/images/preview2.png)
+
+---
+
+## ✨ 주요 기능
+
+* 📻 국내 라디오 채널 지원 (KBS / MBC / SBS / 기타)
+* 🔄 방송사 API 기반 **실시간 스트림 자동 획득**
+* 🎧 ffmpeg 변환 스트리밍 (호환성 개선)
+* 📡 Google Home / Chromecast 캐스트 지원
+* 🎚 볼륨 슬라이더 지원
+* 🖼 채널 아이콘 표시
+* 🌐 내부 IP 자동 탐지
+* 🧩 HACS 설치 지원
+
+---
+
+## 📻 지원 채널
+
+### 🟦 KBS
+
+* KBS 1Radio (`kbs_1radio`)
+* KBS 3Radio (`kbs_3radio`)
+* KBS Classic FM (`kbs_classic`)
+* KBS Cool FM (`kbs_cool`)
+* KBS Happy FM (`kbs_happy`)
+
+### 🟥 MBC
+
+* MBC FM (`mbc_fm`)
+* MBC FM4U (`mbc_fm4u`)
+
+### 🟩 SBS
+
+* SBS Power FM (`sbs_power`)
+* SBS Love FM (`sbs_love`)
+
+### 🟨 기타
+
+* TBS FM (`tbsfm`)
+* TBS eFM (`tbsefm`)
+* TBN FM (`tbnfm`)
+* IFM (`ifm`)
+* EBS FM (`ebsfm`)
+* CBS FM (`cbs_fm`)
+* CBS 음악FM (`cbs_music_fm`)
+* YTN Radio (`ytn`)
+
+---
+
+## 📦 설치 (HACS)
+
+1. HACS → Integrations → ⋮ → Custom repositories
+2. Repository 추가
+
+```
+https://github.com/<your_repo>/korea_radio
+```
+
+3. Category: **Integration**
+4. 설치 후 재시작
+
+---
+
+## ⚙️ 설정
+
+* 설정 → 기기 및 서비스 → 통합 추가
+* "Korea Radio" 선택
+* 대상 `media_player` 선택 (Google Home 등)
+
+---
+
+## 🎮 사용 방법
+
+### UI
+
+* 미디어 플레이어 카드에서 채널 선택
+
+### 서비스 호출
+
+```yaml
+service: media_player.play_media
+target:
+  entity_id: media_player.korea_radio
+data:
+  media_content_type: music
+  media_content_id: kbs_cool
+```
+
+---
+
+## 🖼 아이콘
+
+```text
+custom_components/korea_radio/icons/
+```
+
+예:
+
+```text
+kbs_cool.png
+sbs_power.png
+mbc_fm.png
+tbnfm.png
+```
+
+---
+
+## ⚠️ 주의
+
+* HA와 Google Home은 같은 네트워크(LAN)
+* Docker → `network_mode: host` 권장
+* 일부 방송사는 스트림 변경 가능
+
+---
+
+## 🛠 문제 해결
+
+### 캐스트 실패
+
+* 내부 IP 확인
+* 동일 네트워크 확인
+
+### 채널 재생 안됨
+
+* 스트림 변경 가능
+* Issue 등록
+
+---
