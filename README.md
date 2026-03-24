@@ -160,6 +160,7 @@ tbnfm.jpg
 ## ⚠️ 주의
 
 * HA와 Google Home은 같은 네트워크(LAN)
+* HA는 http://192.x.x.x:8123 과 같이 내부망에서 사설IP 접속이 가능해야 됨
 * Docker → `network_mode: host` 권장
 * 일부 방송사는 스트림 변경 가능
 
