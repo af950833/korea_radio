@@ -1,0 +1,9 @@
+{
+  "name": "Korea Radio",
+  "content_in_root": false,
+  "filename": "korea_radio",
+  "country": ["KR"],
+  "render_readme": true,
+  "iot_class": "local_push",
+  "domains": ["korea_radio"]
+}
