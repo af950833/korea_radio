@@ -1,0 +1,11 @@
+{
+  "domain": "korea_radio",
+  "name": "Korea Radio",
+  "config_flow": true,
+  "version": "1.0.0",
+  "documentation": "https://github.com/af950833/korea_radio",
+  "requirements": [],
+  "dependencies": [],
+  "codeowners": ["@af950833"],
+  "iot_class": "local_polling"
+}
