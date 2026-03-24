@@ -5,7 +5,7 @@
 ![Version](https://img.shields.io/github/v/release/<your_repo>/korea_radio)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-한국 주요 라디오 채널을 Home Assistant에서 재생할 수 있는 커스텀 통합입니다.
+한국 주요 라디오 채널을 Home Assistant에서 재생할 수 있는 커스텀 컴포넌트입니다.
 Google Home(Chromecast) 등 `media_player` 엔티티로 바로 캐스트하여 사용할 수 있습니다.
 
 ---
