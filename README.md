@@ -149,10 +149,10 @@ custom_components/korea_radio/icons/
 예:
 
 ```text
-kbs_cool.png
-sbs_power.png
-mbc_fm.png
-tbnfm.png
+kbs_cool.jpg
+sbs_power.jpg
+mbc_fm.jpg
+tbnfm.jpg
 ```
 
 ---
