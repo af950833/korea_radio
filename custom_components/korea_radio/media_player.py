@@ -2,6 +2,7 @@ import asyncio
 import logging
 import re
 import socket
+import time
 import urllib.parse
 
 import aiohttp
@@ -143,7 +144,7 @@ async def async_get_stream_url(key: str, session: aiohttp.ClientSession) -> str 
 
 
 class FFmpegStreamServer:
-    def __init__(self, hass, original_url, host_ip, bitrate):
+    def __init__(self, hass, original_url, host_ip, bitrate, on_stopped=None):
         self.hass = hass
         self.original_url = original_url
         self.host_ip = host_ip
@@ -154,6 +155,18 @@ class FFmpegStreamServer:
         self._app = None
         self._runner = None
         self._stop_called = False
+        self._on_stopped = on_stopped
+        self._stopped_notified = False
+
+    async def _notify_stopped(self):
+        if self._on_stopped and not self._stopped_notified:
+            self._stopped_notified = True
+            try:
+                result = self._on_stopped()
+                if asyncio.iscoroutine(result):
+                    await result
+            except Exception as err:
+                _LOGGER.debug("FFmpeg stop callback failed: %s", err)
 
     async def start(self):
         sock = socket.socket()
@@ -218,9 +231,14 @@ class FFmpegStreamServer:
                 await response.write(data)
         except (asyncio.CancelledError, ConnectionResetError, BrokenPipeError, aiohttp.ClientConnectionResetError) as err:
             _LOGGER.debug("Stream client disconnected: %s", err)
+            await self._notify_stopped()
             await self.stop()
         except Exception as err:
             _LOGGER.error("Stream error: %s", err)
+            await self._notify_stopped()
+            await self.stop()
+        else:
+            await self._notify_stopped()
             await self.stop()
         return response
 
@@ -248,6 +266,7 @@ class FFmpegStreamServer:
 
         self.site = None
         self._runner = None
+        await self._notify_stopped()
         _LOGGER.info("FFmpeg 스트리밍 서버 종료")
 
     @property
@@ -255,6 +274,16 @@ class FFmpegStreamServer:
         if self.port:
             return f"http://{self.host_ip}:{self.port}/stream"
         return None
+
+    @property
+    def is_running(self):
+        return (
+            self.process is not None
+            and self.process.returncode is None
+            and self.site is not None
+            and self._runner is not None
+            and not self._stop_called
+        )
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
@@ -284,6 +313,12 @@ class KoreaRadioMediaPlayer(MediaPlayerEntity):
         self._volume_level_cache = None
         self._volume_cache_task = None
 
+        self._manual_stop = False
+        self._resume_pending = False
+        self._resume_task = None
+        self._last_interrupt_ts = 0.0
+        self._resume_grace_seconds = 3
+
     @property
     def state(self):
         return self._state
@@ -306,17 +341,18 @@ class KoreaRadioMediaPlayer(MediaPlayerEntity):
 
     @property
     def source(self):
-        return STATIONS.get(self._current_station)
+        return STATIONS.get(getattr(self, "_current_station", None))
 
     @property
     def media_title(self):
-        return self._media_title
+        return getattr(self, "_media_title", None)
 
     @property
     def media_image_url(self):
-        if not self._current_station:
+        current_station = getattr(self, "_current_station", None)
+        if not current_station:
             return None
-        return f"/api/{DOMAIN}/icons/{self._current_station}.jpg"
+        return f"/api/{DOMAIN}/icons/{current_station}.jpg"
 
     @property
     def extra_state_attributes(self):
@@ -326,8 +362,9 @@ class KoreaRadioMediaPlayer(MediaPlayerEntity):
             "bitrate": self._bitrate,
             "entry_id": self._entry_id,
         }
-        if self._current_station:
-            attrs["station_icon_url"] = f"/api/{DOMAIN}/icons/{self._current_station}.png"
+        current_station = getattr(self, "_current_station", None)
+        if current_station:
+            attrs["station_icon_url"] = f"/api/{DOMAIN}/icons/{current_station}.png"
         return attrs
 
     @property
@@ -346,6 +383,84 @@ class KoreaRadioMediaPlayer(MediaPlayerEntity):
         if not target_state:
             return None
         return target_state.attributes.get("is_volume_muted")
+
+    def _ffmpeg_server_alive(self) -> bool:
+        return self._ffmpeg_server is not None and self._ffmpeg_server.is_running
+
+    async def _handle_ffmpeg_stopped(self):
+        _LOGGER.info(
+            "FFmpeg stopped callback: manual_stop=%s current_station=%s resume_pending=%s",
+            self._manual_stop,
+            self._current_station,
+            self._resume_pending,
+        )
+        self._ffmpeg_server = None
+        self._last_stream_url = None
+        self._state = STATE_IDLE
+        self.async_write_ha_state()
+
+        if self._manual_stop or not self._current_station:
+            _LOGGER.info(
+                "Auto resume skipped: manual_stop=%s current_station=%s",
+                self._manual_stop,
+                self._current_station,
+            )
+            return
+
+        self._resume_pending = True
+        self._last_interrupt_ts = time.monotonic()
+        _LOGGER.info(
+            "Auto resume scheduled: station=%s grace=%ss ts=%.3f",
+            self._current_station,
+            self._resume_grace_seconds,
+            self._last_interrupt_ts,
+        )
+
+        if self._resume_task is None or self._resume_task.done():
+            _LOGGER.info("Auto resume task created")
+            self._resume_task = self.hass.async_create_task(
+                self._wait_and_resume_after_interrupts()
+            )
+
+    async def _wait_and_resume_after_interrupts(self):
+        _LOGGER.info("Auto resume loop started")
+        try:
+            while self._resume_pending:
+                await asyncio.sleep(0.5)
+
+                if self._manual_stop:
+                    _LOGGER.info("Auto resume cancelled by manual stop")
+                    self._resume_pending = False
+                    return
+
+                target_state = self.hass.states.get(self._target_entity)
+                if not target_state:
+                    _LOGGER.info("Auto resume waiting: target state unavailable")
+                    continue
+
+                quiet_for = time.monotonic() - self._last_interrupt_ts
+                _LOGGER.info(
+                    "Auto resume check: target_state=%s quiet_for=%.2f pending=%s ffmpeg_alive=%s",
+                    target_state.state,
+                    quiet_for,
+                    self._resume_pending,
+                    self._ffmpeg_server_alive(),
+                )
+
+                if target_state.state == STATE_PLAYING:
+                    continue
+
+                if quiet_for < self._resume_grace_seconds:
+                    continue
+
+                self._resume_pending = False
+                _LOGGER.info("Auto resume firing for station: %s", self._current_station)
+                await self.async_media_play()
+                _LOGGER.info("Auto resume async_media_play() completed")
+                return
+        except asyncio.CancelledError:
+            _LOGGER.info("Auto resume task cancelled")
+            return
 
     async def _clear_volume_cache_later(self, delay=0.8):
         try:
@@ -431,9 +546,10 @@ class KoreaRadioMediaPlayer(MediaPlayerEntity):
     async def async_update(self):
         target_state = self.hass.states.get(self._target_entity)
         if not target_state:
+            self._state = STATE_IDLE
             return
 
-        if target_state.state == STATE_PLAYING:
+        if target_state.state == STATE_PLAYING and self._ffmpeg_server_alive():
             self._state = STATE_PLAYING
         elif self._state != STATE_IDLE and target_state.state not in ("off", "idle", "paused", "standby"):
             self._state = target_state.state
@@ -457,6 +573,9 @@ class KoreaRadioMediaPlayer(MediaPlayerEntity):
                 except Exception as err:
                     _LOGGER.debug("Error stopping previous media (ignored): %s", err)
 
+            if self._ffmpeg_server and not self._ffmpeg_server_alive():
+                self._ffmpeg_server = None
+
             if self._ffmpeg_server:
                 try:
                     await self._ffmpeg_server.stop()
@@ -471,7 +590,13 @@ class KoreaRadioMediaPlayer(MediaPlayerEntity):
                 _LOGGER.error("스트림 URL을 가져올 수 없음: %s", key)
                 return
 
-            self._ffmpeg_server = FFmpegStreamServer(self.hass, stream_url, self._host_ip, self._bitrate)
+            self._ffmpeg_server = FFmpegStreamServer(
+                self.hass,
+                stream_url,
+                self._host_ip,
+                self._bitrate,
+                on_stopped=self._handle_ffmpeg_stopped,
+            )
             if await self._ffmpeg_server.start():
                 final_url = self._ffmpeg_server.url
                 _LOGGER.info("%s에 ffmpeg 변환 적용: %s (%dkbps)", key, final_url, self._bitrate)
@@ -479,6 +604,8 @@ class KoreaRadioMediaPlayer(MediaPlayerEntity):
                 _LOGGER.error("%s ffmpeg 변환 실패, 원본 시도", key)
                 final_url = stream_url
 
+            self._manual_stop = False
+            self._resume_pending = False
             self._current_station = key
             self._media_title = name
             self._last_stream_url = final_url
@@ -498,10 +625,25 @@ class KoreaRadioMediaPlayer(MediaPlayerEntity):
             break
 
     async def async_media_play(self):
-        if self._current_station and self._last_stream_url:
+        if self._current_station:
             target_state = self.hass.states.get(self._target_entity)
-            if target_state and target_state.state == "playing":
+            _LOGGER.info(
+                "async_media_play called: station=%s target_state=%s ffmpeg_alive=%s last_stream=%s resume_pending=%s",
+                self._current_station,
+                target_state.state if target_state else None,
+                self._ffmpeg_server_alive(),
+                bool(self._last_stream_url),
+                self._resume_pending,
+            )
+
+            if target_state and target_state.state == "playing" and self._ffmpeg_server_alive():
+                _LOGGER.info("async_media_play ignored because target is already playing and ffmpeg is alive")
                 return
+
+            if self._ffmpeg_server and not self._ffmpeg_server_alive():
+                _LOGGER.info("Stopped ffmpeg server detected after interruption, recreating stream server")
+                self._ffmpeg_server = None
+                self._last_stream_url = None
 
             if not self._ffmpeg_server:
                 session = async_get_clientsession(self.hass)
@@ -510,17 +652,31 @@ class KoreaRadioMediaPlayer(MediaPlayerEntity):
                     _LOGGER.error("스트림 URL을 가져올 수 없음: %s", self._current_station)
                     return
 
-                self._ffmpeg_server = FFmpegStreamServer(self.hass, stream_url, self._host_ip, self._bitrate)
+                self._ffmpeg_server = FFmpegStreamServer(
+                    self.hass,
+                    stream_url,
+                    self._host_ip,
+                    self._bitrate,
+                    on_stopped=self._handle_ffmpeg_stopped,
+                )
                 if await self._ffmpeg_server.start():
                     final_url = self._ffmpeg_server.url
                     self._last_stream_url = final_url
+                    _LOGGER.info("New ffmpeg server started in async_media_play: %s", final_url)
                 else:
                     _LOGGER.error("ffmpeg 변환 실패")
                     return
 
+            self._manual_stop = False
+            self._resume_pending = False
             self._state = STATE_PLAYING
             self.async_write_ha_state()
 
+            _LOGGER.info(
+                "Calling media_player.play_media target=%s url=%s",
+                self._target_entity,
+                self._last_stream_url,
+            )
             await self.hass.services.async_call(
                 "media_player",
                 "play_media",
@@ -532,9 +688,20 @@ class KoreaRadioMediaPlayer(MediaPlayerEntity):
                 blocking=False,
             )
         else:
-            _LOGGER.warning("Play requested but no station selected")
+            _LOGGER.warning(
+                "Play requested but no station selected (current_station=%s last_stream=%s)",
+                self._current_station,
+                bool(self._last_stream_url),
+            )
 
     async def async_media_stop(self):
+        self._manual_stop = True
+        self._resume_pending = False
+
+        if self._resume_task and not self._resume_task.done():
+            self._resume_task.cancel()
+            self._resume_task = None
+
         target_state = self.hass.states.get(self._target_entity)
         if target_state and target_state.state == "playing":
             try:
