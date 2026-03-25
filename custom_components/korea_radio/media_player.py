@@ -13,6 +13,8 @@ from homeassistant.components.media_player import (
     MediaPlayerEntityFeature,
 )
 from homeassistant.const import CONF_NAME, STATE_IDLE, STATE_PLAYING
+
+STATE_OFF = "off"
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import DOMAIN, FIXED_URLS, STATIONS
@@ -318,6 +320,7 @@ class KoreaRadioMediaPlayer(MediaPlayerEntity):
         self._resume_task = None
         self._last_interrupt_ts = 0.0
         self._resume_grace_seconds = 3
+        self._forced_off = False
 
     @property
     def state(self):
@@ -545,13 +548,22 @@ class KoreaRadioMediaPlayer(MediaPlayerEntity):
 
     async def async_update(self):
         target_state = self.hass.states.get(self._target_entity)
+
+        if self._forced_off:
+            if target_state and target_state.state == STATE_PLAYING and self._ffmpeg_server_alive():
+                self._forced_off = False
+                self._state = STATE_PLAYING
+            else:
+                self._state = STATE_OFF
+                return
+
         if not target_state:
             self._state = STATE_IDLE
             return
 
         if target_state.state == STATE_PLAYING and self._ffmpeg_server_alive():
             self._state = STATE_PLAYING
-        elif self._state != STATE_IDLE and target_state.state not in ("off", "idle", "paused", "standby"):
+        elif self._state != STATE_IDLE and target_state.state not in (STATE_OFF, "idle", "paused", "standby"):
             self._state = target_state.state
         else:
             self._state = STATE_IDLE
@@ -606,6 +618,7 @@ class KoreaRadioMediaPlayer(MediaPlayerEntity):
 
             self._manual_stop = False
             self._resume_pending = False
+            self._forced_off = False
             self._current_station = key
             self._media_title = name
             self._last_stream_url = final_url
@@ -669,6 +682,7 @@ class KoreaRadioMediaPlayer(MediaPlayerEntity):
 
             self._manual_stop = False
             self._resume_pending = False
+            self._forced_off = False
             self._state = STATE_PLAYING
             self.async_write_ha_state()
 
@@ -725,4 +739,32 @@ class KoreaRadioMediaPlayer(MediaPlayerEntity):
         self.async_write_ha_state()
 
     async def async_turn_off(self):
-        await self.async_media_stop()
+        self._manual_stop = True
+        self._resume_pending = False
+
+        if self._resume_task and not self._resume_task.done():
+            self._resume_task.cancel()
+            self._resume_task = None
+
+        target_state = self.hass.states.get(self._target_entity)
+        if target_state and target_state.state == "playing":
+            try:
+                await self.hass.services.async_call(
+                    "media_player",
+                    "media_stop",
+                    {"entity_id": self._target_entity},
+                )
+                await asyncio.sleep(0.3)
+            except Exception as err:
+                _LOGGER.debug("Error stopping media on turn_off (ignored): %s", err)
+
+        if self._ffmpeg_server:
+            try:
+                await self._ffmpeg_server.stop()
+            except Exception as err:
+                _LOGGER.error("Error stopping ffmpeg server on turn_off: %s", err)
+            self._ffmpeg_server = None
+
+        self._forced_off = True
+        self._state = STATE_OFF
+        self.async_write_ha_state()
