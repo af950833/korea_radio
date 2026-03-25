@@ -2,7 +2,7 @@
   "domain": "korea_radio",
   "name": "Korea Radio",
   "config_flow": true,
-  "version": "1.0.6",
+  "version": "1.0.7",
   "documentation": "https://github.com/af950833/korea_radio",
   "requirements": [],
   "dependencies": [],
