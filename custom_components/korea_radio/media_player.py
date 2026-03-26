@@ -162,16 +162,17 @@ class FFmpegStreamServer:
     """Manages ffmpeg process and serves the transcoded stream over HTTP."""
 
     __slots__ = (
-        "hass", "original_url", "host_ip", "bitrate", "process", "site", "port",
+        "hass", "original_url", "host_ip", "bitrate", "station_key", "process", "site", "port",
         "_app", "_runner", "_stop_called", "_on_stopped", "_stopped_notified",
         "_stderr_task", "_stream_task"
     )
 
-    def __init__(self, hass, original_url, host_ip, bitrate, on_stopped=None):
+    def __init__(self, hass, original_url, host_ip, bitrate, station_key=None, on_stopped=None):
         self.hass = hass
         self.original_url = original_url
         self.host_ip = host_ip
         self.bitrate = bitrate
+        self.station_key = station_key
         self.process = None
         self.site = None
         self.port = None
@@ -202,10 +203,26 @@ class FFmpegStreamServer:
             self.port = sock.getsockname()[1]
 
         # Build ffmpeg command
-        cmd = [
-            "ffmpeg",
-            "-headers", "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "-headers", "Referer: http://mini.imbc.com/",
+        header_value = None
+
+        if self.station_key == "obs":
+            header_value = (
+                "User-Agent: Mozilla/5.0\r\n"
+                "Referer: https://www.obs.co.kr/\r\n"
+                "Origin: https://www.obs.co.kr\r\n"
+            )
+        elif self.station_key and self.station_key.startswith("mbc_"):
+            header_value = (
+                "User-Agent: Mozilla/5.0\r\n"
+                "Referer: http://mini.imbc.com/\r\n"
+            )
+
+        cmd = ["ffmpeg"]
+
+        if header_value:
+            cmd += ["-headers", header_value]
+
+        cmd += [
             "-i", self.original_url,
             "-c:a", "mp3",
             "-b:a", f"{self.bitrate}k",
@@ -447,6 +464,7 @@ class KoreaRadioMediaPlayer(MediaPlayerEntity):
             stream_url,
             self._host_ip,
             self._bitrate,
+            station_key=station_key,
             on_stopped=self._handle_ffmpeg_stopped,
         )
         if await self._ffmpeg_server.start():
