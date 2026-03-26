@@ -348,12 +348,16 @@ class FFmpegStreamServer:
 # ----- Media Player Entity -----
 async def async_setup_entry(hass, entry, async_add_entities):
     """Set up the Korea Radio media player platform from a config entry."""
-    name = entry.data.get(CONF_NAME, "Korea Radio")
-    target_entity = entry.data.get("target_media_player")
-    bitrate = int(entry.data.get("bitrate", DEFAULT_BITRATE))
+    config = {**entry.data, **entry.options}
+    name = config.get(CONF_NAME, "Korea Radio")
+    target_entity = config.get("target_media_player")
+    bitrate = int(config.get("bitrate", DEFAULT_BITRATE))
     host_ip = detect_host_ip(hass)
+    channels = config.get("channels", list(STATIONS.keys()))
 
-    async_add_entities([KoreaRadioMediaPlayer(target_entity, name, host_ip, bitrate, entry.entry_id)])
+    async_add_entities(
+        [KoreaRadioMediaPlayer(target_entity, name, host_ip, bitrate, entry.entry_id, channels)]
+    )
 
 
 class KoreaRadioMediaPlayer(MediaPlayerEntity):
@@ -364,10 +368,10 @@ class KoreaRadioMediaPlayer(MediaPlayerEntity):
         "_host_ip", "_bitrate", "_state", "_current_station", "_media_title",
         "_ffmpeg_server", "_last_stream_url", "_volume_level_cache", "_volume_cache_task",
         "_manual_stop", "_resume_pending", "_resume_task", "_last_interrupt_ts",
-        "_forced_off"
+        "_forced_off", "_enabled_stations"
     )
 
-    def __init__(self, target_entity, name, host_ip, bitrate, entry_id):
+    def __init__(self, target_entity, name, host_ip, bitrate, entry_id, channels):
         self._target_entity = target_entity
         self._attr_name = name
         self._attr_icon = "mdi:radio"
@@ -375,6 +379,7 @@ class KoreaRadioMediaPlayer(MediaPlayerEntity):
         self._entry_id = entry_id
         self._host_ip = host_ip
         self._bitrate = bitrate
+        self._enabled_stations = channels or list(STATIONS.keys())
         self._state = STATE_IDLE
         self._current_station = None
         self._media_title = None
@@ -408,7 +413,7 @@ class KoreaRadioMediaPlayer(MediaPlayerEntity):
 
     @property
     def source_list(self):
-        return list(STATIONS.values())
+        return [STATIONS[key] for key in self._enabled_stations if key in STATIONS]
 
     @property
     def source(self):
@@ -669,6 +674,8 @@ class KoreaRadioMediaPlayer(MediaPlayerEntity):
     # ---------- Media Control ----------
     async def async_select_source(self, source):
         for key, name in STATIONS.items():
+            if key not in self._enabled_stations:
+                continue
             if name != source:
                 continue
 
