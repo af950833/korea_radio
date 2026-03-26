@@ -6,7 +6,7 @@ STATIONS = {
     "tbsefm": "TBS eFM",
     "tbnfm": "TBN FM",
     "ifm": "IFM",
-    "obs": "OBS",
+    "obs": "OBS FM",
     "ebsfm": "EBS FM",
     "cbs_music_fm": "CBS Music FM",
     "cbs_fm": "CBS FM",
