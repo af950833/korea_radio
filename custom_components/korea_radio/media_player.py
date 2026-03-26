@@ -103,11 +103,20 @@ async def async_get_sbs_url(channel: str, session: aiohttp.ClientSession) -> str
     sbs_ch = {
         "sbs_power": ("powerfm", "powerpc"),
         "sbs_love": ("lovefm", "lovepc"),
+        "sbs_gorilla": ("sbsdmb", "sbsdmbpc"),
     }
     url = f"https://apis.sbs.co.kr/play-api/1.0/livestream/{sbs_ch[channel][1]}/{sbs_ch[channel][0]}?protocol=hls&ssl=Y"
     headers = {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_16_0) AppleWebKit/537.36",
-        "Referer": "https://gorealraplayer.radio.sbs.co.kr/main.html",
+        "Host": "apis.sbs.co.kr",
+        "Connection": "keep-alive",
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_16_0) AppleWebKit/537.36 (KHTML, like Gecko) GOREALRA/1.2.1 Chrome/85.0.4183.121 Electron/10.1.3 Safari/537.36",
+        "Accept": "*/*",
+        "Origin": "https://gorealraplayer.radio.sbs.co.kr",
+        "Sec-Fetch-Site": "same-site",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Dest": "empty",
+        "Referer": "https://gorealraplayer.radio.sbs.co.kr/main.html?v=1.2.1",
+        "Accept-Language": "ko",
     }
     try:
         async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=5)) as resp:
