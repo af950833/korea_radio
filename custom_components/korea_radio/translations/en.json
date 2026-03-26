@@ -1,0 +1,28 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configure Korea Radio",
+        "data": {
+          "name": "Name",
+          "target_media_player": "Output media player",
+          "bitrate": "Bitrate",
+          "channels": "Channels"
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Korea Radio options",
+        "data": {
+          "name": "Name",
+          "target_media_player": "Output media player",
+          "bitrate": "Bitrate",
+          "channels": "Channels"
+        }
+      }
+    }
+  }
+}
