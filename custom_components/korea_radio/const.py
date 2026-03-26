@@ -17,6 +17,7 @@ STATIONS = {
     "kbs_3radio": "KBS 3Radio",
     "sbs_power": "SBS Power FM",
     "sbs_love": "SBS Love FM",
+    "sbs_gorilla": "SBS GorillaM",
     "mbc_fm": "MBC FM",
     "mbc_fm4u": "MBC FM4U",
 }
