@@ -10,6 +10,8 @@ STATIONS = {
     "ebsfm": "EBS FM",
     "cbs_music_fm": "CBS Music FM",
     "cbs_fm": "CBS FM",
+    "cbs_joy4u": "CBS JOY4U",
+    "afn": "AFN FM Humphreys",
     "kbs_cool": "KBS Cool FM",
     "kbs_happy": "KBS Happy FM",
     "kbs_classic": "KBS Classic FM",
@@ -20,6 +22,7 @@ STATIONS = {
     "sbs_gorilla": "SBS GorillaM",
     "mbc_fm": "MBC FM",
     "mbc_fm4u": "MBC FM4U",
+    "mbc_allthatmusic": "MBC Mini AllThatMusic",
 }
 
 FIXED_URLS = {
@@ -32,4 +35,6 @@ FIXED_URLS = {
     "ebsfm": "https://ebsonair.ebs.co.kr/fmradiofamilypc/familypc1m/playlist.m3u8",
     "cbs_music_fm": "http://m-aac.cbs.co.kr/cbs939/_definst_/cbs939.stream/playlist.m3u8",
     "cbs_fm": "http://m-aac.cbs.co.kr/cbs981/_definst_/cbs981.stream/playlist.m3u8",
+    "cbs_joy4u": "https://m-aac.cbs.co.kr/mweb_cbscmc/_definst_/cbscmc.stream/playlist.m3u8",
+    "afn": "https://14623.live.streamtheworld.com/AFNP_OSNAAC.aac",
 }
