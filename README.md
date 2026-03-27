@@ -189,5 +189,6 @@ tbnfm.jpg
 * 2026/03/26 Ver 1.0.8 - OBS 추가 및 버그 수정
 * 2026/03/26 Ver 1.0.9 - 채널 선택 추가 및 메뉴 번역 추가
 * 2026/03/26 Ver 1.1.0 - SBS 고릴라M 채널 추가
+* 2026/03/27 Ver 1.1.1 - MBC Mini AllThatMusic, CBS JOY4U, AFN FM Humphreys 채널 추가
 
 ---
