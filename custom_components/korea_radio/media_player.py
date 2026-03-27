@@ -131,6 +131,7 @@ async def async_get_mbc_url(channel: str, session: aiohttp.ClientSession) -> str
     mbc_ch = {
         "mbc_fm4u": "mfm",
         "mbc_fm": "sfm",
+        "mbc_allthatmusic": "chm",
     }
     url = f"https://sminiplay.imbc.com/aacplay.ashx?agent=webapp&channel={mbc_ch[channel]}&callback=jarvis.miniInfo.loadOnAirComplete"
     headers = {
