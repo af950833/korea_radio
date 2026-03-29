@@ -194,5 +194,6 @@ tbnfm.jpg
 * 2026/03/26 Ver 1.1.0 - SBS 고릴라M 채널 추가
 * 2026/03/27 Ver 1.1.1 - MBC Mini AllThatMusic, CBS JOY4U, AFN FM Humphreys 채널 추가
 * 2026/03/29 Ver 1.2.0 - 현재 방송 정보(AFK 제외 전채널), 재생곡 정보(SBS & MBC) 표시 기능 추가
+* 2026/03/29 Ver 1.2.1 - 코드 최적화, 기능 변경 없음
 
 ---
