@@ -770,13 +770,30 @@ async def async_setup_entry(hass, entry, async_add_entities):
     bitrate = int(config.get("bitrate", DEFAULT_BITRATE))
     host_ip = detect_host_ip(hass)
     channels = config.get("channels", list(STATIONS.keys()))
-    async_add_entities([KoreaRadioMediaPlayer(target_entity, name, host_ip, bitrate, entry.entry_id, channels)])
+    default_channel = config.get("default_channel")
+
+    if default_channel not in channels:
+        default_channel = channels[0] if channels else None
+
+    async_add_entities(
+        [
+            KoreaRadioMediaPlayer(
+                target_entity,
+                name,
+                host_ip,
+                bitrate,
+                entry.entry_id,
+                channels,
+                default_channel,
+            )
+        ]
+    )
 
 
 class KoreaRadioMediaPlayer(MediaPlayerEntity):
     __slots__ = (
         "_target_entity", "_attr_name", "_attr_icon", "_attr_unique_id", "_entry_id",
-        "_host_ip", "_bitrate", "_state", "_current_station", "_media_title", "_media_artist",
+        "_host_ip", "_bitrate", "_state", "_current_station", "_default_channel", "_media_title", "_media_artist",
         "_ffmpeg_server", "_last_stream_url", "_volume_level_cache", "_volume_cache_task",
         "_manual_stop", "_resume_pending", "_resume_task", "_last_interrupt_ts",
         "_forced_off", "_enabled_stations", "_now_playing_task", "_last_program_update_ts",
@@ -784,7 +801,7 @@ class KoreaRadioMediaPlayer(MediaPlayerEntity):
         "_program_attrs",  # unified dict for station-specific attributes
     )
 
-    def __init__(self, target_entity, name, host_ip, bitrate, entry_id, channels):
+    def __init__(self, target_entity, name, host_ip, bitrate, entry_id, channels, default_channel):
         self._target_entity = target_entity
         self._attr_name = name
         self._attr_icon = "mdi:radio"
@@ -794,7 +811,10 @@ class KoreaRadioMediaPlayer(MediaPlayerEntity):
         self._bitrate = bitrate
         self._enabled_stations = channels or list(STATIONS.keys())
         self._state = STATE_IDLE
-        self._current_station = None
+        self._default_channel = (
+            default_channel if default_channel in self._enabled_stations else None
+        )
+        self._current_station = self._default_channel
         self._media_title = None
         self._media_artist = None
         self._ffmpeg_server = None
@@ -811,6 +831,9 @@ class KoreaRadioMediaPlayer(MediaPlayerEntity):
         self._resume_task = None
         self._last_interrupt_ts = 0.0
         self._forced_off = False
+
+        if self._current_station:
+            self._set_default_media_title()
 
     # ---------- Properties ----------
     @property
@@ -858,6 +881,7 @@ class KoreaRadioMediaPlayer(MediaPlayerEntity):
             "target_media_player": self._target_entity,
             "bitrate": self._bitrate,
             "entry_id": self._entry_id,
+            "default_channel": self._default_channel,
         }
         if self._current_station:
             attrs["station_icon_url"] = f"/api/{DOMAIN}/icons/{self._current_station}.jpg"
