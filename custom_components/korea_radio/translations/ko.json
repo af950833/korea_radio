@@ -7,7 +7,8 @@
           "name": "이름",
           "target_media_player": "출력 미디어 플레이어",
           "bitrate": "음질",
-          "channels": "채널 선택"
+          "channels": "채널 선택",
+          "default_channel": "기본 채널"
         }
       }
     }
@@ -20,7 +21,8 @@
           "name": "이름",
           "target_media_player": "출력 미디어 플레이어",
           "bitrate": "음질",
-          "channels": "채널 선택"
+          "channels": "채널 선택",
+          "default_channel": "기본 채널"
         }
       }
     }
