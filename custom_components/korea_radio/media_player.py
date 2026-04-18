@@ -1396,4 +1396,4 @@ class KoreaRadioMediaPlayer(MediaPlayerEntity):
         self._forced_off = True
         self._state = STATE_OFF
         self.async_write_ha_state()
-        
+    
