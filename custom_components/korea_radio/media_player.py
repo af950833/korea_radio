@@ -929,29 +929,32 @@ class KoreaRadioMediaPlayer(MediaPlayerEntity):
         self.async_write_ha_state()
 
     async def _update_sbs_now_playing(self, force: bool = False):
-        if not force and (time.monotonic() - self._last_program_update_ts) < PROGRAM_UPDATE_INTERVAL:
-            return
         session = async_get_clientsession(self.hass)
         info = await async_get_sbs_nowplaying(self._current_station, session)
-        if info and info.get("title"):
-            self._program_attrs["sbs_program_title"] = info["title"]
-            self._program_attrs["sbs_program_start"] = info.get("start")
-            self._program_attrs["sbs_program_end"] = info.get("end")
+        should_update_program = force or (time.monotonic() - self._last_program_update_ts) >= PROGRAM_UPDATE_INTERVAL
+        if info:
+            if should_update_program and info.get("title"):
+                self._program_attrs["sbs_program_title"] = info["title"]
+                self._program_attrs["sbs_program_start"] = info.get("start")
+                self._program_attrs["sbs_program_end"] = info.get("end")
+                self._last_program_update_ts = time.monotonic()
             self._program_attrs["sbs_song_title"] = info.get("song")
             self._program_attrs["sbs_artist"] = info.get("artist")
-            if self._program_attrs["sbs_song_title"] and self._program_attrs["sbs_artist"]:
-                song_line = f"{self._program_attrs['sbs_artist']} - {self._program_attrs['sbs_song_title']}"
-                self._media_title = f"{self._program_attrs['sbs_program_title']} | {song_line}"
-                self._media_artist = song_line
-            elif self._program_attrs["sbs_song_title"]:
-                self._media_title = f"{self._program_attrs['sbs_program_title']} | {self._program_attrs['sbs_song_title']}"
-                self._media_artist = self._program_attrs["sbs_song_title"]
-            else:
-                self._media_title = self._program_attrs["sbs_program_title"]
-                self._media_artist = None
-            self._last_program_update_ts = time.monotonic()
         else:
-            self._set_default_media_title()
+            self._program_attrs["sbs_song_title"] = None
+            self._program_attrs["sbs_artist"] = None
+
+        title = self._program_attrs.get("sbs_program_title") or STATIONS.get(self._current_station)
+        if self._program_attrs.get("sbs_song_title") and self._program_attrs.get("sbs_artist"):
+            song_line = f"{self._program_attrs['sbs_artist']} - {self._program_attrs['sbs_song_title']}"
+            self._media_title = f"{title} | {song_line}"
+            self._media_artist = song_line
+        elif self._program_attrs.get("sbs_song_title"):
+            self._media_title = f"{title} | {self._program_attrs['sbs_song_title']}"
+            self._media_artist = self._program_attrs["sbs_song_title"]
+        else:
+            self._media_title = title
+            self._media_artist = None
         self.async_write_ha_state()
 
     async def _update_mbc_now_playing(self, force: bool = False):
@@ -1149,7 +1152,7 @@ class KoreaRadioMediaPlayer(MediaPlayerEntity):
     async def _now_playing_loop(self):
         try:
             while True:
-                if not self._current_station or self._state == STATE_OFF:
+                if not self._current_station or self._state != STATE_PLAYING:
                     return
                 await self._update_program_info(force=False)
                 await asyncio.sleep(SONG_UPDATE_INTERVAL)
