@@ -19,6 +19,7 @@ from homeassistant.components.media_player import (
 )
 from homeassistant.const import CONF_NAME, STATE_IDLE, STATE_PLAYING, STATE_OFF
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.network import NoURLAvailableError, get_url
 
 from .const import DOMAIN, FIXED_URLS, STATIONS
 
@@ -1220,15 +1221,53 @@ class KoreaRadioMediaPlayer(MediaPlayerEntity):
             except Exception as err:
                 _LOGGER.debug("Error stopping media (ignored): %s", err)
 
+    def _absolute_image_url(self) -> Optional[str]:
+        """캐스트 기기가 직접 받아가므로 상대경로로는 안 된다.
+
+        아이콘은 인증 없는 정적 경로(/api/korea_radio/icons)라 그대로 노출해도 된다.
+        """
+        if not self._current_station:
+            return None
+        path = f"/api/{DOMAIN}/icons/{self._current_station}.jpg"
+        try:
+            base = get_url(self.hass, prefer_external=False, allow_ip=True)
+        except NoURLAvailableError:
+            if not self._host_ip:
+                return None
+            base = f"http://{self._host_ip}:8123"
+        return f"{base}{path}"
+
+    def _cast_metadata(self) -> Optional[Dict[str, Any]]:
+        """캐스트 대상에 띄울 정보. 넣을 게 없으면 None."""
+        station = STATIONS.get(self._current_station)
+        if not self._media_title and not station:
+            return None
+        # metadataType 3 = MusicTrackMediaMetadata
+        metadata: Dict[str, Any] = {"metadataType": 3}
+        if self._media_title:
+            metadata["title"] = self._media_title
+        if station:
+            metadata["artist"] = station
+            metadata["albumName"] = station
+        image = self._absolute_image_url()
+        if image:
+            metadata["images"] = [{"url": image}]
+        return metadata
+
     async def _play_on_target(self, url: str):
+        data = {
+            "entity_id": self._target_entity,
+            # Cast 는 music 으로 인식해야 metadata 를 화면에 띄운다
+            "media_content_type": "music",
+            "media_content_id": url,
+        }
+        metadata = self._cast_metadata()
+        if metadata:
+            data["extra"] = {"metadata": metadata}
         await self.hass.services.async_call(
             "media_player",
             "play_media",
-            {
-                "entity_id": self._target_entity,
-                "media_content_type": "audio/mpeg",
-                "media_content_id": url,
-            },
+            data,
             blocking=False,
         )
 
