@@ -1257,8 +1257,7 @@ class KoreaRadioMediaPlayer(MediaPlayerEntity):
     async def _play_on_target(self, url: str):
         data = {
             "entity_id": self._target_entity,
-            # Cast 는 music 으로 인식해야 metadata 를 화면에 띄운다
-            "media_content_type": "music",
+            "media_content_type": "audio/mpeg",
             "media_content_id": url,
         }
         metadata = self._cast_metadata()
